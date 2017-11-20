@@ -1,0 +1,215 @@
+<section>
+
+<h2>systemd-nspawn について</h2>
+<p>roid123</p>
+
+<p>2017/02/17</p>
+
+<aside class="notes">
+
+<p>s キーで発表者用ノートを開ける</p>
+
+</aside>
+
+</section>
+<section>
+
+<h3>systemd-nspawn とは</h3>
+<p>とりあえず <code>man systemd-nspawn</code> してみる</p>
+
+<p><img src="images/nspawn_ss.png" alt="man_nspawn"></p>
+
+<aside class="notes">
+
+<p>分からない/知らないときはとりあえずマニュアルコマンドを使いますよね。</p>
+
+<p>なんかつらつら書いてあります。</p>
+
+<p>デバッグとかテストとかで使えそうなコンテナを立ち上げてくれるっぽいですね。</p>
+
+<p>軽量コンテナとか書いてあるのでそれなりに軽そうな感じがします。</p>
+
+<p>IPC (プロセス間通信) とかプロセスツリーとかファイルシステム階層を仮想化してくれるっぽいですね。</p>
+
+</aside>
+
+</section>
+<section>
+
+<h3>systemd-nspawn とは</h3>
+<ul>
+  <li>(docker などと同様の) 一種のコンテナ技術
+    <ul>
+      <li>systemd が入っている OS ならどれでも使える (はず)</li>
+      <li>Arch とか Ubuntu とか CentOS7 とか</li>
+    </ul>
+  </li>
+  <li>chroot を強化したもの[1]</li>
+  <li>chroot 環境下で別の OS が動くイメージ
+    <ul>
+      <li>カーネルは共用であり、カーネル周りへのアクセスは read only となる</li>
+      <li>カーネルパラメータも共通 (のはず)</li>
+    </ul>
+  </li>
+</ul>
+
+<p><span style="font-size:normal; float: left">[1] <a href="https://wiki.archlinuxjp.org/index.php/Systemd-nspawn">systemd-nspawn - ArchWiki</a></span></p>
+
+<aside class="notes">
+
+<p>ざっくりまとめるとこんな感じです。</p>
+
+<p>ぶっちゃけこの ArchWiki に概要とか使い方とか全部書いてあります。</p>
+
+</aside>
+
+</section>
+<section>
+
+<h3>デモ</h3>
+<ul>
+  <li>ホスト
+    <ul>
+      <li>Arch Linux (4.8.13-1-ARCH)</li>
+      <li>systemd 232</li>
+    </ul>
+  </li>
+  <li>Arch をインストールして起動してみる</li>
+</ul>
+
+<aside class="notes">
+
+<p>では実際に nspawn で Arch のコンテナを立ち上げるところまでお見せします。</p>
+
+<p>使用しているホストマシンは Arch で、バージョンは書いてある通りです。</p>
+
+</aside>
+
+</section>
+<section>
+
+<h3>使用したコマンド</h3>
+<pre><code class="language-sh">$ mkdir arch
+$ pacstrap -i -c -d arch base --ignore linux
+$ systemd-nspawn -b -D arch --bind=/var/cache/pacman/pkg
+</code></pre>
+
+</section>
+<section>
+
+<h3>実際使ってみた感じ</h3>
+<ul>
+  <li>起動が速い</li>
+  <li>(docker よりも) VM っぽく扱えるのがいい
+    <ul>
+      <li>docker では権限周りが面倒な systemctl がそのまま扱える</li>
+      <li>が、中でさらに nspawn を動かすとネットワークがおかしくなるなど、完全に自由というわけでもない</li>
+    </ul>
+  </li>
+  <li>machinectl という管理コマンドがあるものの、複数コンテナを管理しようとするといまいち</li>
+  <li>デプロイがしにくい
+    <ul>
+      <li>tar で固めて転送する…?</li>
+    </ul>
+  </li>
+</ul>
+
+<aside class="notes">
+
+<p>そんなにバリバリ使ったわけではなく、まだ評価中ではあるのですが、使用感を書いてみました。</p>
+
+<p>私は元々 docker で sshd を動かして VM っぽく使っていたりするのですが、<br>
+個人的には docker よりも better VM として使えるかなーと感じています。</p>
+
+<p>vagrant 使えばいいじゃないかと言われると確かにそうなのですが、<br>
+ローカルで vagarnt を動かすと起動が遅かったりするので、軽く試す場合はこっちの方がよかったりするのかな、と。</p>
+
+<p>ただ、所詮コンテナなのでなんでもできるわけではなく、結構色々制約があったりします。<br>
+特にネットワーク周り。</p>
+
+<p>docker をインストールしてみましたが、立ち上げるときに modprobe なり iptables なりを変更しているようで、<br>
+上手く立ち上がりませんでした。</p>
+
+<p>あとはデプロイがしにくいですね。インストールしたディレクトリをコピーすれば使い回せますが、<br>
+コピーしたコンテナだと適当に作ったユーザで ping が not permitted とか言われて使えなかったので、<br>
+何らか制限がありそうな気もします。</p>
+
+<p>オプションを指定することで仮想インタフェースを作ってくれたりと、設定の幅はありそうなので、この辺いじれば<br>
+ネットワークの制約もなくなるかもしれません。</p>
+
+</aside>
+
+</section>
+<section>
+
+<h3>まとめ</h3>
+<ul>
+  <li>systemd-nspawn は docker と同じようなコンテナ仮想化技術
+    <ul>
+      <li>chroot っぽく隔離しつつ、プロセスツリー等が別の OS を起動できる</li>
+      <li>docker の 1 コンテナ = 1 プロセスの考え方が馴染まない人に向いているかも?</li>
+    </ul>
+  </li>
+  <li>動作はかなり軽いので、カーネル周りをいじらないものに限定されるものの、検証用途に使えそう
+    <ul>
+      <li>ネットワーク周りに制約がありそうなのでその辺は十分な注意が必要</li>
+    </ul>
+  </li>
+</ul>
+
+<aside class="notes">
+
+<p>結局 docker exec して中身をガシガシいじってしまう、私のような人は向いているかもしれません。<br>
+docker イメージを使って nspawn のイメージを作る、なんて記事もあったので、他にも面白い使い方があるかもしれません。</p>
+
+</aside>
+
+</section>
+<section>
+
+<h3>おまけ</h3>
+<ul>
+  <li>このスライドは reveal-ck[2] を使って作りました
+    <ul>
+      <li>reveal.js[3] をより使いやすくしたもの</li>
+    </ul>
+  </li>
+</ul>
+
+<pre><code class="language-sh">$ gem install reveal-ck
+$ vim slides.md
+$ reveal-ck generate
+$ reveal-ck serve
+</code></pre>
+
+<p><span style="font-size:normal; float: left">[2] <a href="https://github.com/jedcn/reveal-ck">GitHub - jedcn/reveal-ck</a></span><br>
+<span style="font-size:normal; float: left">[3] <a href="https://github.com/hakimel/reveal.js/">GitHub - hakimel/reveal.js</a></span></p>
+
+<aside class="notes">
+
+<p>reveal.js 自体は HTML を書かないと使えないのですが、reveal-ck を使えば Markdown ファイルからスライドを生成することができます。<br>
+とはいえ、文字色の変更や微調整で HTML タグを使ったりするのでそこはいまいちだったりします。</p>
+
+</aside>
+
+<!--
+  disable uppercase
+  via. http://srz-zumix.blogspot.jp/2014/09/revealjs-markdown.html
+-->
+<style type="text/css">
+    .reveal h1,
+    .reveal h2,
+    .reveal h3,
+    .reveal h4,
+    .reveal h5,
+    .reveal h6 {
+      text-transform: none;
+    }
+</style>
+
+<!--
+<span style="color:red">red text</span>
+<span style="font-size:small">small text</span>
+-->
+
+</section>
